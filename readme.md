@@ -281,6 +281,30 @@ Se puede usar la directiva `ngClass` o el atajo de clase nativo.
 </strong>
 ```
 
+### Content Projection (`ng-content`)
+
+El Content Projection (o inyección de contenido) permite pasar bloques de código HTML desde un componente padre hacia el interior de un componente hijo. Se logra mediante la etiqueta `<ng-content>`.
+
+**Componente Hijo (Plantilla, ej: `card.component.html`)**
+```html
+<div class="card shadow-xl">
+  <div class="card-body">
+    <h2 class="card-title">{{ title() }}</h2>
+    <!-- Aquí se inyectará el contenido HTML que envíe el padre -->
+    <ng-content></ng-content>
+  </div>
+</div>
+```
+
+**Componente Padre (Uso del componente hijo)**
+```html
+<app-card title="Mi Tarjeta">
+  <!-- Todo este contenido será proyectado en el lugar de <ng-content> -->
+  <p>Este es el contenido inyectado desde el padre.</p>
+  <button class="btn btn-primary">Acción</button>
+</app-card>
+```
+
 ---
 
 ## PARTE 4: REACTIVIDAD MODERNA (SIGNALS)
@@ -614,27 +638,220 @@ countryResource = rxResource({
 
 ## PARTE 10: PIPES
 
-Los Pipes formatean datos en el HTML antes de mostrarlos al usuario.
+Los Pipes formatean datos en el HTML antes de mostrarlos al usuario sin mutar la data original.
 
-**Importación en Standalone**
+**Importación en Standalone (Angular 14+)**
 ```ts
-import { UpperCasePipe, DecimalPipe, DatePipe } from '@angular/common';
-// Agregar a imports: [UpperCasePipe, DecimalPipe, DatePipe]
+import { UpperCasePipe, DecimalPipe, DatePipe, JsonPipe, AsyncPipe, CurrencyPipe } from '@angular/common';
+// Agregar a la propiedad `imports` del componente
 ```
 
-**Ejemplos Comunes:**
+### 1. Pipes Básicos (Textos y Fechas)
 ```html
-<!-- Texto a Mayúsculas -->
+<!-- Textos -->
+<p>{{ name() | lowercase }}</p>
 <p>{{ name() | uppercase }}</p>
+<p>{{ name() | titlecase }}</p> <!-- Ej: samuel antunez -> Samuel Antunez -->
 
-<!-- Formato de Fechas -->
-<p>{{ miFecha | date:'short' }}</p>
+<!-- Fechas (DatePipe) -->
+<p>{{ currentDate | date }}</p> <!-- Default -->
+<p>{{ currentDate | date:'short':'GMT-4' }}</p> <!-- Corto con Zona Horaria -->
+<p>{{ currentDate | date:'long':'GMT-6' }}</p> <!-- Largo con Zona Horaria -->
+<p>{{ currentDate | date:'yyyy MM' }}</p> <!-- Formato Personalizado -->
+<p>{{ currentDate | date:'EEEE d, MMMM' }}</p> <!-- Día y Mes explícito -->
+```
 
-<!-- DecimalPipe: Formatea números. 
-  Estructura: 'minIntegerDigits.minFractionDigits-maxFractionDigits' 
-  Ej: '1.2-2' significa 1 dígito entero mínimo, 2 decimales mínimos, 2 máximos. -->
-<p>Población: {{ population | number:'1.0-0' }}</p>
-<p>Precio: {{ 1234.5 | number:'1.2-2' }}</p>
+### 2. Pipes de Números (Decimal, Currency, Percent)
+```html
+<!-- DecimalPipe ('minInteger.minFraction-maxFraction') -->
+<p>Ventas: {{ 24325451.5567 | number:'1.2-2' }}</p>
+
+<!-- CurrencyPipe ('Moneda':'Formato del Simbolo':'minInteger.minFraction-maxFraction') -->
+<p>Precio: {{ 1234.5 | currency:'CAD':'symbol-narrow':'1.4-4' }}</p>
+
+<!-- PercentPipe -->
+<p>Porcentaje: {{ 0.4856 | percent }}</p> <!-- 48.56% -->
+```
+
+### 3. Pipes Poco Comunes (Uncommon)
+```html
+<!-- i18nSelect: Muestra un texto basado en una llave (ej. género) -->
+<!-- invitationMap = { male: 'invitarlo', female: 'invitarla' } -->
+<p>Es un placer {{ client().gender | i18nSelect:invitationMap }} a nuestro evento.</p>
+
+<!-- i18nPlural: Muestra texto dependiendo de un número (ej. cantidad) -->
+<!-- clientsMap = { '=0': 'ningún cliente', '=1': 'un cliente', 'other': '# clientes' } -->
+<p>Actualmente {{ clients().length | i18nPlural:clientsMap }}</p>
+
+<!-- SlicePipe: Corta arreglos o strings -->
+<p> {{ clients() | slice:0:2 }} </p> <!-- Muestra de la pos 0 a la 1 -->
+
+<!-- JsonPipe: Útil para debugear objetos -->
+<pre> {{ client() | json }} </pre>
+
+<!-- KeyValuePipe: Permite iterar objetos en un @for -->
+<ul>
+  @for (item of profile | keyvalue; track $index) {
+    <li> {{ item.key | titlecase }}: {{ item.value }} </li>
+  }
+</ul>
+
+<!-- AsyncPipe: Se suscribe automáticamente a Promesas u Observables -->
+<p> {{ miPromesa | async }} </p>
+@if (miObservable | async; as value) {
+  <p> Valor emitido: {{ value }} </p>
+}
+```
+
+### 4. Pipes Personalizados (Custom Pipes)
+Puedes crear tus propios Pipes para transformaciones específicas implementando la interfaz `PipeTransform`.
+
+**ToggleCasePipe**
+```ts
+// toggle-case.pipe.ts
+import { Pipe, PipeTransform } from '@angular/core';
+
+@Pipe({
+  name: 'toggleCase',
+  standalone: true // Angular 14+
+})
+export class ToggleCasePipe implements PipeTransform {
+  // El primer argumento (value) es lo que recibe el pipe
+  // Los siguientes son los argumentos del pipe separados por ':'
+  transform(value: string, upper: boolean = true): string {
+    return upper ? value.toUpperCase() : value.toLowerCase();
+  }
+}
+```
+**Uso en el HTML:**
+```html
+<!-- Pasando un argumento booleano al custom pipe -->
+<p> {{ 'Samuel' | toggleCase:true }} </p> <!-- SAMUEL -->
+```
+
+**canFlyPipe**
+```ts
+// can-Fly.pipe.ts
+import { Pipe, PipeTransform } from '@angular/core';
+
+type CanFly = 'Puede volar' | 'No puede volar';
+
+@Pipe({
+  name: 'canFly' // selector html
+})
+export class canFlyPipe implements PipeTransform {
+  transform(value: boolean): CanFly {
+    return value ? 'Puede volar' : 'No puede volar';
+  }
+}
+```
+**Uso en el HTML:**
+```html
+<p>{{ hero.canFly | canFly }}</p>
+```
+
+**HeroCreatorPipe**
+```ts
+// hero-creater.pipe.ts
+import { Pipe, PipeTransform } from '@angular/core';
+import { Creator } from '../interfaces/hero.interface';
+
+@Pipe({
+  name: 'heroCreator'
+})
+export class HeroCreatorPipe implements PipeTransform {
+  transform(value: Creator): String {
+    return Creator[value];
+  }
+}
+```
+
+**HeroFilterPipe**
+```ts
+// hero-filter.pipe.ts
+import { Pipe, PipeTransform } from '@angular/core';
+import { Hero } from '../interfaces/hero.interface';
+
+@Pipe({
+  name: 'heroFilter'
+})
+export class HeroFilterPipe implements PipeTransform {
+  transform(value: Hero[], searchQuery: string): Hero[] {
+    if (!searchQuery) return value;
+    searchQuery = searchQuery.toLowerCase();
+    return value.filter(
+      hero => hero.name.toLowerCase().includes(searchQuery)
+    );
+  }
+}
+```
+
+**HeroSortByPipe**
+```ts
+// hero-sort-by.pipe.ts
+import { Pipe, PipeTransform } from '@angular/core';
+import { Hero } from '../interfaces/hero.interface';
+
+@Pipe({
+  name: 'heroSortBy'
+})
+export class HeroSortByPipe implements PipeTransform {
+  transform(value: Hero[], sortBy: keyof Hero | null): Hero[] {
+    if (!sortBy || sortBy === null) return value;
+
+    switch (sortBy) {
+      case 'name':
+        return value.sort((a, b) => a.name.localeCompare(b.name));
+      case 'canFly':
+        return value.sort((a, b) => (a.canFly ? 1 : -1) - (b.canFly ? 1 : -1));
+      case 'color':
+        return value.sort((a, b) => a.color - b.color);
+      case 'creator':
+        return value.sort((a, b) => a.creator - b.creator);
+    }
+    return value.slice(0, 10);
+  }
+}
+```
+**Uso en el HTML:**
+```html
+@for (hero of heroes | heroSortBy:sortBy; track hero.id) { ... }
+```
+
+**HeroTextColorPipe**
+```ts
+// hero-text-color.pipe.ts
+import { Pipe, type PipeTransform } from '@angular/core';
+import { Color, ColorMap } from '../interfaces/hero.interface';
+
+@Pipe({
+  name: 'HeroTextColor',
+})
+export class HeroTextColorPipe implements PipeTransform {
+  transform(value: Color): string {
+    return ColorMap[value];
+  }
+}
+```
+
+**HeroColorPipe**
+```ts
+// heroColor.pipe.ts
+import { Pipe, type PipeTransform } from '@angular/core';
+import { Color } from '../interfaces/hero.interface';
+
+@Pipe({
+  name: 'HeroColor',
+})
+export class HeroColorPipe implements PipeTransform {
+  transform(value: Color): string {
+    return Color[value];
+  }
+}
+```
+**Uso en el HTML:**
+```html
+<span [style.color]="hero.color | HeroTextColor">{{ hero.color | HeroColor }}</span>
 ```
 
 ---
@@ -704,7 +921,318 @@ Si quieres que al cambiar de pestaña y volver a la vista, los resultados de la 
 
 ---
 
-## PARTE 12: RECURSOS ÚTILES Y LIBRERÍAS
+## PARTE 12: FORMULARIOS REACTIVOS
+
+Esta sección detalla el uso de formularios reactivos en Angular, basada en los patrones, componentes y utilidades recomendadas.
+
+### 1. Configuración Inicial y Conceptos Básicos
+
+Para utilizar formularios reactivos, es necesario importar `ReactiveFormsModule` en el componente o módulo donde se vaya a usar.
+
+Un formulario reactivo se compone principalmente de `FormGroup` (que agrupa varios campos) y `FormControl` (que representa un campo individual).
+
+#### Ejemplo Básico (Sin FormBuilder)
+```ts
+import { ReactiveFormsModule, FormGroup, FormControl } from '@angular/forms';
+
+@Component({
+  imports: [ReactiveFormsModule],
+  // ...
+})
+export class MiComponente {
+  myForm = new FormGroup({
+    name: new FormControl(''),
+    price: new FormControl(0),
+    inStorage: new FormControl(0),
+    // Formularios anidados
+    direccion: new FormGroup({
+      calle: new FormControl(), 
+      ciudad: new FormControl()
+    })
+  });
+}
+```
+
+Para conectar esto con el HTML:
+```html
+<form autocomplete="off" [formGroup]="myForm">
+  <input type="text" formControlName="name">
+  <input type="number" formControlName="price">
+  <input type="number" formControlName="inStorage">
+</form>
+```
+
+### 2. Simplificando con FormBuilder
+
+`FormBuilder` es un servicio inyectable que simplifica la creación de instancias de `FormGroup`, `FormControl` y `FormArray`.
+
+**Ejemplo:**
+```ts
+import { Component, inject } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+
+export class BasicPageComponent {
+  private fb = inject(FormBuilder);
+
+  myForm: FormGroup = this.fb.group({
+    // [ValorInicial, [ValidadoresSíncronos], [ValidadoresAsíncronos]]
+    name: ['', [Validators.required, Validators.minLength(3)]],
+    price: [0, [Validators.required, Validators.min(10)]],
+    inStorage: [0, [Validators.required, Validators.min(0)]]
+  });
+
+  onSave() {
+    if (this.myForm.invalid) {
+      this.myForm.markAllAsTouched(); // Marca todos los campos como tocados para disparar errores
+      return;
+    }
+    // Lógica para guardar...
+
+    // Resetear el formulario con valores por defecto
+    this.myForm.reset({ price: 0, inStorage: 0 });
+  }
+}
+```
+
+En el HTML interceptamos el evento de envío nativo de Angular `(ngSubmit)`:
+```html
+<form autocomplete="off" [formGroup]="myForm" (ngSubmit)="onSave()">
+  <button type="submit">Guardar</button>
+</form>
+```
+
+### 3. Manejo Centralizado de Errores (`FormUtils`)
+
+En lugar de repetir la lógica para mostrar errores en cada componente, se utiliza una clase de utilidad `FormUtils` que centraliza esta tarea.
+
+#### Extraer el mensaje de error
+El método `getTextErrors` mapea los errores generados por los validadores a mensajes de texto amigables:
+
+```ts
+// src/app/utils/form.utils.ts
+export class FormUtils {
+  static getTextErrors(errors: ValidationErrors): string | null {
+    for (const key of Object.keys(errors)) {
+      switch (key) {
+        case 'required': return 'Este campo es requerido';
+        case 'minlength': return `Minimo de ${errors['minlength'].requiredLength} caracteres`;
+        case 'min': return `Valor minimo de ${errors['min'].min}`;
+        case 'pattern': return `El formato no es válido`;
+        // ... otros errores
+      }
+    }
+    return null;
+  }
+
+  // Saber si un campo tiene errores y ha sido tocado
+  static isValidField(form: FormGroup, fieldName: string): boolean | null {
+    return (!!form.controls[fieldName].errors && form.controls[fieldName].touched);
+  }
+
+  // Obtener el string de error
+  static getFieldError(form: FormGroup, fieldName: string): string | null {
+    if (!form.controls[fieldName]) return null;
+    const errors = form.controls[fieldName].errors ?? {};
+    return FormUtils.getTextErrors(errors);
+  }
+}
+```
+
+**Uso en el HTML:**
+```html
+<input class="form-control" formControlName="name">
+
+@if (formUtils.isValidField(myForm, 'name')) {
+  <span class="form-text text-danger">
+    {{ formUtils.getFieldError(myForm, 'name') }}
+  </span>
+}
+```
+
+### 4. Formularios Dinámicos (`FormArray`)
+
+Cuando no sabemos la cantidad exacta de campos que tendrá un formulario (ej. una lista de juegos favoritos), utilizamos `FormArray`.
+
+**Ejemplo:**
+```ts
+export class DynamicPageComponent {
+  private fb = inject(FormBuilder);
+  formUtils = FormUtils;
+
+  myForm: FormGroup = this.fb.group({
+    name: ['', [Validators.required, Validators.minLength(3)]],
+    favoriteGames: this.fb.array([], [Validators.minLength(2)]) // FormArray vacío al inicio
+  });
+
+  // Control independiente para el input de agregar
+  newFavorite = new FormControl('', [Validators.minLength(3)]);
+
+  // Getter para facilitar el acceso al FormArray
+  get favoriteGamesControl() {
+    return this.myForm.get('favoriteGames') as FormArray;
+  }
+
+  // Agregar un campo al FormArray
+  onAddToFavorite() {
+    if (this.newFavorite.invalid) return;
+    const newGame = this.newFavorite.value;
+    
+    // Se inserta un nuevo FormControl en el FormArray
+    this.favoriteGamesControl.push(
+      this.fb.control(newGame, [Validators.required, Validators.minLength(3)])
+    );
+    this.newFavorite.reset();
+  }
+
+  // Eliminar un campo del FormArray
+  onDeleteFavorite(index: number) {
+    this.favoriteGamesControl.removeAt(index);
+  }
+}
+```
+
+**Uso en el HTML:**
+```html
+<!-- Input para agregar nuevos favoritos -->
+<div class="input-group">
+  <input class="form-control" [formControl]="newFavorite" 
+         (keydown.enter)="onAddToFavorite()" (keydown.enter)="$event.preventDefault()">
+  <button type="button" (click)="onAddToFavorite()">Agregar favorito</button>
+</div>
+
+<!-- Iterando el FormArray -->
+<div formArrayName="favoriteGames">
+  @for (favoriteGame of favoriteGamesControl.controls; track $index; let i = $index) {
+    <div class="input-group">
+      <!-- formControlName usa el índice (i) -->
+      <input class="form-control" [formControlName]="i">
+      <button type="button" (click)="onDeleteFavorite(i)">Eliminar</button>
+    </div>
+  }
+</div>
+```
+
+### 5. Switches, Checkboxes y Radios
+
+Para trabajar con valores booleanos (ej. términos y condiciones) o selecciones únicas.
+
+**Ejemplo:**
+```ts
+export class SwitchesPageComponent {
+  private fb = inject(FormBuilder);
+
+  myForm: FormGroup = this.fb.group({
+    gender: [, Validators.required], // Para un Radio Button
+    wantNotifications: [true],       // Para un Toggle/Switch booleano
+    termsAndConditions: [false, Validators.requiredTrue], // Debe ser 'true' para ser válido
+  });
+}
+```
+
+### 6. Validaciones Avanzadas (Custom, Async y Cross-field)
+
+#### Validadores Personalizados (Custom Validators)
+Son funciones que reciben un `AbstractControl` y devuelven `ValidationErrors` si falla, o `null` si es válido.
+```ts
+// En FormUtils
+static notStrider(control: AbstractControl): ValidationErrors | null {
+  if (control.value === 'Strider') {
+    return { noStrider: true }; // Error
+  }
+  return null; // Válido
+}
+
+// Uso en el componente:
+username: ['', [Validators.required, FormUtils.notStrider]]
+```
+
+#### Validaciones Asíncronas
+Se utilizan para validaciones que requieren peticiones HTTP (ej. verificar si un email ya existe). Deben retornar un `Promise` o un `Observable`. Se colocan como **tercer argumento** en el arreglo de configuración del campo.
+```ts
+// Simulación en FormUtils
+static async checkingServerResponse(control: AbstractControl): Promise<ValidationErrors | null> {
+  await sleep(1000); // Simula delay HTTP
+  if (control.value === 'hola@mundo.com') {
+    return { emailTaken: true };
+  }
+  return null;
+}
+
+// Uso:
+email: ['', [Validators.required], [FormUtils.checkingServerResponse]]
+```
+
+#### Validaciones Cruzadas (Cross-field Validation)
+Se aplican a nivel de `FormGroup` en lugar de a nivel de `FormControl`. Útiles para verificar que dos contraseñas sean iguales.
+```ts
+// En FormUtils (Función que retorna una función validadora)
+static isFieldOneEqualFieldTwo(field1: string, field2: string) {
+  return (formGroup: AbstractControl) => {
+    const field1Value = formGroup.get(field1)?.value;
+    const field2Value = formGroup.get(field2)?.value;
+
+    return (field1Value === field2Value) ? null : { passwordNotEqual: true };
+  }
+}
+
+// Uso en Componente
+myForm: FormGroup = this.fb.group({
+  password: ['', [Validators.required, Validators.minLength(6)]],
+  confirmPassword: ['', Validators.required]
+}, {
+  // Opciones a nivel de FormGroup
+  validators: [
+    FormUtils.isFieldOneEqualFieldTwo('password', 'confirmPassword')
+  ]
+});
+```
+
+### 7. Métodos Útiles y Reactividad
+
+#### setValue vs patchValue
+Ambos se usan para actualizar los valores del formulario desde TypeScript, pero tienen una diferencia clave:
+* `setValue()`: Exige que le pases un objeto con **TODOS** los controles del formulario. Si falta uno, lanza error.
+* `patchValue()`: Permite actualizar **solo algunos** controles.
+
+```ts
+// Actualiza solo el campo 'name', ignorando el resto
+this.myForm.patchValue({
+  name: 'Goku'
+});
+
+// Resetea el formulario y establece valores iniciales
+this.myForm.reset({
+  name: '',
+  price: 0,
+  inStorage: 0
+});
+```
+
+#### valueChanges y statusChanges
+Dado que los formularios son reactivos, puedes suscribirte a los cambios de valor o estado en tiempo real usando Observables (RxJS).
+
+```ts
+ngOnInit() {
+  // Suscribirse a cambios en un campo específico
+  this.myForm.get('name')?.valueChanges.subscribe(value => {
+    console.log('El nombre cambió a:', value);
+  });
+
+  // Suscribirse a cambios en todo el formulario
+  this.myForm.valueChanges.subscribe(formValue => {
+    console.log('Valores del formulario:', formValue);
+  });
+
+  // Suscribirse a cambios en el estado (VALID, INVALID, PENDING)
+  this.myForm.statusChanges.subscribe(status => {
+    console.log('Estado del formulario:', status);
+  });
+}
+```
+
+---
+
+## PARTE 13: RECURSOS ÚTILES Y LIBRERÍAS
 
 **Oficiales y Documentación**
 * [Hoja de Atajos Oficial (Angular Cheat Sheet)](https://github.com/Klerith/mas-talento/blob/main/angular/angular-cheat-sheet.pdf)
