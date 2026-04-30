@@ -1232,7 +1232,86 @@ ngOnInit() {
 
 ---
 
-## PARTE 13: RECURSOS ÚTILES Y LIBRERÍAS
+## PARTE 13: CICLO DE VIDA DE LOS COMPONENTES (LIFECYCLE HOOKS)
+
+Angular gestiona el ciclo de vida de los componentes desde su creación hasta su destrucción. Los hooks son métodos que se ejecutan en momentos específicos para permitirnos interactuar con el componente en diferentes etapas.
+
+### 1. Hooks Tradicionales
+Se implementan mediante interfaces y se ejecutan en este orden aproximado:
+
+1.  **constructor**: Se llama cuando se instancia la clase. No es un hook de Angular propiamente, sino de TypeScript. No se recomienda para peticiones HTTP.
+2.  **ngOnChanges**: Se ejecuta cada vez que cambian las entradas (`input`) del componente. Recibe un objeto `SimpleChanges`.
+3.  **ngOnInit**: Se ejecuta una sola vez después de que Angular ha inicializado todas las entradas. Lugar ideal para inicializar data o peticiones HTTP.
+4.  **ngDoCheck**: Se ejecuta en cada ciclo de detección de cambios. Útil para lógica de verificación personalizada.
+5.  **ngAfterContentInit**: Se ejecuta una vez después de que el contenido proyectado (`ng-content`) se ha inicializado.
+6.  **ngAfterContentChecked**: Se ejecuta cada vez que el contenido proyectado ha sido verificado.
+7.  **ngAfterViewInit**: Se ejecuta una vez después de que la vista del componente (y sus hijos) se ha inicializado. Ideal para manipular el DOM directamente o librerías de terceros (ej. Mapas, Charts).
+8.  **ngAfterViewChecked**: Se ejecuta cada vez que la vista del componente ha sido verificada.
+9.  **ngOnDestroy**: Se ejecuta justo antes de que el componente sea destruido. Se usa para limpiar suscripciones, timers y evitar fugas de memoria.
+
+#### Ejemplo de `ngOnChanges` y `SimpleChanges`:
+Este hook es fundamental para reaccionar a cambios en las propiedades de entrada.
+
+```ts
+import { Component, input, OnChanges, SimpleChanges } from '@angular/core';
+
+@Component({ ... })
+export class TitleComponent implements OnChanges {
+  title = input.required<string>();
+
+  ngOnChanges(changes: SimpleChanges) {
+    console.log('Cambios detectados:', changes);
+
+    if (changes['title']) {
+      const { previousValue, currentValue, firstChange } = changes['title'];
+      console.log(`Anterior: ${previousValue}, Actual: ${currentValue}`);
+    }
+  }
+}
+```
+
+### 2. Hooks Modernos (Angular 17+)
+Estas funciones se ejecutan en momentos específicos del renderizado y son más eficientes para tareas que requieren el DOM ya procesado.
+
+*   **afterNextRender**: Se ejecuta una vez la próxima vez que todos los componentes se hayan renderizado en el DOM.
+*   **afterEveryRender**: Se ejecuta cada vez que todos los componentes se hayan renderizado en el DOM (en cada ciclo de renderizado).
+
+```ts
+import { afterNextRender, afterEveryRender } from '@angular/core';
+
+constructor() {
+  afterNextRender(() => {
+    console.log('El DOM está listo para interactuar con librerías externas');
+  });
+}
+```
+
+### 3. Reactividad y Efectos (`effect`)
+Aunque no es un "hook" de ciclo de vida tradicional, `effect()` se comporta de manera similar al reaccionar a cambios en señales.
+
+```ts
+import { effect } from '@angular/core';
+
+export class MyComponent {
+  name = signal('Samuel');
+
+  constructor() {
+    effect((onCleanup) => {
+      console.log('El nombre cambió a:', this.name());
+
+      // onCleanup se ejecuta antes de la próxima ejecución del efecto o al destruir el componente
+      onCleanup(() => {
+        console.log('Limpiando recursos...');
+      });
+    });
+  }
+}
+```
+
+---
+
+## PARTE 14: RECURSOS ÚTILES Y LIBRERÍAS
+
 
 **Oficiales y Documentación**
 * [Hoja de Atajos Oficial (Angular Cheat Sheet)](https://github.com/Klerith/mas-talento/blob/main/angular/angular-cheat-sheet.pdf)
