@@ -1482,7 +1482,7 @@ export class SearchComponent implements OnInit {
   }
 }
 
----
+```
 
 ## PARTE 18: RECURSOS ÚTILES Y LIBRERÍAS
 
