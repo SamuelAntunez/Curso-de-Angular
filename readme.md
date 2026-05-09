@@ -4,6 +4,29 @@ Esta guía resume los conceptos fundamentales y avanzados de TypeScript y Angula
 
 ---
 
+## Índice
+
+1. [PARTE 1: TYPESCRIPT - FUNDAMENTOS](#parte-1-typescript---fundamentos)
+2. [PARTE 2: ANGULAR - CONCEPTOS BÁSICOS](#parte-2-angular---conceptos-básicos)
+3. [PARTE 3: COMPONENTES Y PLANTILLAS (TEMPLATES)](#parte-3-componentes-y-plantillas-templates)
+4. [PARTE 4: REACTIVIDAD MODERNA (SIGNALS)](#parte-4-reactividad-moderna-signals)
+5. [PARTE 5: COMUNICACIÓN ENTRE COMPONENTES](#parte-5-comunicación-entre-componentes)
+6. [PARTE 6: ENRUTAMIENTO Y NAVEGACIÓN (ROUTING)](#parte-6-enrutamiento-y-navegación-routing)
+7. [PARTE 7: SERVICIOS E INYECCIÓN DE DEPENDENCIAS](#parte-7-servicios-e-inyección-de-dependencias)
+8. [PARTE 8: PETICIONES HTTP Y MANEJO DE APIS](#parte-8-peticiones-http-y-manejo-de-apis)
+9. [PARTE 9: MANEJO DE ESTADO ASÍNCRONO (Angular 19+)](#parte-9-manejo-de-estado-asíncrono-angular-19)
+10. [PARTE 10: PIPES](#parte-10-pipes)
+11. [PARTE 11: TÉCNICAS AVANZADAS Y BUENAS PRÁCTICAS](#parte-11-técnicas-avanzadas-y-buenas-prácticas)
+12. [PARTE 12: FORMULARIOS REACTIVOS](#parte-12-formularios-reactivos)
+13. [PARTE 13: CICLO DE VIDA DE LOS COMPONENTES (LIFECYCLE HOOKS)](#parte-13-ciclo-de-vida-de-los-componentes-lifecycle-hooks)
+14. [PARTE 14: GUARDIANES DE RUTAS (GUARDS)](#parte-14-guardianes-de-rutas-guards)
+15. [PARTE 15: INTERCEPTORES HTTP](#parte-15-interceptores-http)
+16. [PARTE 16: VISTAS DIFERIDAS (DEFERRABLE VIEWS)](#parte-16-vistas-diferidas-deferrable-views)
+17. [PARTE 17: RXJS Y OBSERVABLES](#parte-17-rxjs-y-observables)
+18. [PARTE 18: RECURSOS ÚTILES Y LIBRERÍAS](#parte-18-recursos-útiles-y-librerías)
+
+---
+
 ## PARTE 1: TYPESCRIPT - FUNDAMENTOS
 
 TypeScript es un lenguaje de programación desarrollado por Microsoft que extiende JavaScript añadiendo tipado estático opcional, interfaces, clases y otras características avanzadas. Permite detectar errores en tiempo de compilación y mejora la mantenibilidad del código.
@@ -1310,7 +1333,158 @@ export class MyComponent {
 
 ---
 
-## PARTE 14: RECURSOS ÚTILES Y LIBRERÍAS
+## PARTE 14: GUARDIANES DE RUTAS (GUARDS)
+
+Los Guards (Guardianes) permiten proteger y restringir el acceso a ciertas rutas basadas en condiciones (ej. usuario autenticado, permisos). En Angular 15+, se utilizan funciones (Functional Guards) en lugar de clases.
+
+### Tipos de Guards principales:
+* **canActivate:** Determina si una ruta puede ser activada.
+* **canActivateChild:** Determina si las rutas hijas de una ruta pueden ser activadas.
+* **canDeactivate:** Determina si puedes salir de una ruta (útil para advertir cambios sin guardar).
+* **canMatch:** Determina si una ruta debe ser considerada durante el emparejamiento (útil para lazy loading y role-based routing, reemplaza a `canLoad`).
+
+**Ejemplo de canActivate (Functional Guard)**
+```ts
+// auth.guard.ts
+import { inject } from '@angular/core';
+import { Router, CanActivateFn } from '@angular/router';
+import { AuthService } from './auth.service';
+
+export const authGuard: CanActivateFn = (route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.isAuthenticated()) {
+    return true; // Permite el acceso
+  } else {
+    router.navigate(['/login']); // Redirige al login
+    return false; // Deniega el acceso
+  }
+};
+```
+
+**Uso en las Rutas**
+```ts
+// app.routes.ts
+export const routes: Routes = [
+  { 
+    path: 'dashboard', 
+    component: DashboardComponent,
+    canActivate: [authGuard] // Aplicando el Guard
+  }
+];
+```
+
+---
+
+## PARTE 15: INTERCEPTORES HTTP
+
+Los Interceptores permiten inspeccionar y transformar las peticiones HTTP que salen de la aplicación, y las respuestas que entran. Son ideales para añadir Tokens de autenticación a cada petición, manejar errores globalmente, o mostrar un Loading Spinner.
+En Angular 15+, se recomiendan los Functional Interceptors.
+
+**Ejemplo de Interceptor de Autenticación**
+```ts
+// auth.interceptor.ts
+import { HttpInterceptorFn } from '@angular/common/http';
+
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const token = localStorage.getItem('token');
+  
+  if (token) {
+    // Clona la petición y añade el Header de Autorización
+    const clonedRequest = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return next(clonedRequest); // Envía la petición modificada
+  }
+
+  return next(req); // Envía la petición original si no hay token
+};
+```
+
+**Configuración en `app.config.ts`**
+```ts
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './auth.interceptor';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideHttpClient(withInterceptors([authInterceptor]))
+  ]
+};
+```
+
+---
+
+## PARTE 16: VISTAS DIFERIDAS (DEFERRABLE VIEWS)
+
+Angular 17 introdujo el bloque `@defer`, permitiendo cargar componentes (y sus dependencias) de forma diferida (lazy loading) a nivel de template sin configuración extra de enrutamiento.
+
+```html
+@defer (on viewport) {
+  <app-heavy-chart />
+} @placeholder {
+  <div>El gráfico se cargará cuando hagas scroll hasta aquí...</div>
+} @loading (minimum 1s) {
+  <div>Cargando el componente...</div>
+} @error {
+  <div>Ocurrió un error al cargar el gráfico.</div>
+}
+```
+
+### Triggers de `@defer`:
+* **on viewport:** Carga cuando el elemento entra en pantalla.
+* **on interaction:** Carga al hacer clic o interactuar con un elemento de referencia.
+* **on hover:** Carga al pasar el mouse por encima.
+* **on idle:** (Por defecto) Carga cuando el navegador está inactivo.
+* **on timer(5s):** Carga después de 5 segundos.
+* **when condicion:** Carga cuando una expresión booleana se evalúa como `true`.
+
+---
+
+## PARTE 17: RXJS Y OBSERVABLES
+
+RxJS es una librería central en Angular para manejar programación reactiva y flujos asíncronos. Los Observables emiten múltiples valores en el tiempo y pueden cancelarse (a diferencia de las Promesas).
+
+### Operadores Clave:
+* **map:** Transforma la data emitida.
+* **tap:** Permite ejecutar efectos secundarios (como hacer un log o guardar en memoria) sin alterar el flujo de datos.
+* **catchError:** Intercepta y maneja errores en el flujo.
+* **switchMap:** Cancela la petición anterior si llega una nueva (Ideal para barras de búsqueda).
+* **of:** Crea un Observable a partir de valores estáticos.
+
+**Ejemplo Práctico con `switchMap` y `debounced` en Angular:**
+```ts
+import { Component, inject, OnInit } from '@angular/core';
+import { FormControl } from '@angular/forms';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, of } from 'rxjs';
+
+export class SearchComponent implements OnInit {
+  searchInput = new FormControl('');
+  private apiService = inject(ApiService);
+  results: any[] = [];
+
+  ngOnInit() {
+    this.searchInput.valueChanges.pipe(
+      debounceTime(300), // Espera 300ms después de la última tecla
+      distinctUntilChanged(), // Solo continúa si el valor es diferente al anterior
+      switchMap(query => {
+        if (!query) return of([]); // Retorna array vacío si no hay query
+        return this.apiService.search(query).pipe(
+          catchError(() => of([])) // Manejo de error para no romper la suscripción
+        );
+      })
+    ).subscribe(data => {
+      this.results = data;
+    });
+  }
+}
+
+---
+
+## PARTE 18: RECURSOS ÚTILES Y LIBRERÍAS
 
 
 **Oficiales y Documentación**
